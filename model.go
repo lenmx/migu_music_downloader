@@ -18,14 +18,6 @@ type TabHeader struct {
 	ColName string
 }
 
-type TabDataType int
-
-const (
-	TabDataType_Placeholder TabDataType = 0
-	TabDataType_Data        TabDataType = 1
-	TabDataType_Buttons     TabDataType = 2
-)
-
 type TabData struct {
 	Type    TabDataType
 	ColName string

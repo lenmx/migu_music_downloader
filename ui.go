@@ -15,8 +15,9 @@ import (
 )
 
 var (
-	datas = [][]interface{}{
-		{TabHeader{Text: "名称"}, TabHeader{Text: "歌手"}, TabHeader{Text: "专辑"}, TabHeader{Text: "操作"}},
+	searchSuccess = "000000"
+	datas         = [][]interface{}{
+		{TabHeader{Text: "名称"}, TabHeader{Text: "歌手"}, TabHeader{Text: "专辑"}, TabHeader{Text: "无损下载"}, TabHeader{Text: "高品质下载"}},
 	}
 
 	myApp           fyne.App
@@ -25,6 +26,7 @@ var (
 	txtKeyword      *widget.Entry
 	txtDownloadPath *widget.Entry
 	form            *widget.Form
+	tab             *widget.Table
 	pageContainer   *fyne.Container
 	pageButtongs    = []fyne.CanvasObject{}
 	pageSize        = 20
@@ -42,20 +44,14 @@ func MiguMusicInit(setting *MiguMusicSetting) {
 
 	loading = widget.NewProgressBarInfinite()
 	loading.Hide()
-	loading.MinSize()
 
 	txtKeyword = widget.NewEntry()
 	txtKeyword.PlaceHolder = "请输入关键字"
-	txtKeyword.MinSize()
 
 	txtDownloadPath = widget.NewEntry()
 	txtDownloadPath.PlaceHolder = "请设置保存路径"
-	txtDownloadPath.MinSize()
 
-	btnBatchDownload := widget.NewButton("下载本页", setting.OnBatchDownload)
-	btnBatchDownload.MinSize()
-
-	tab := widget.NewTable(
+	tab = widget.NewTable(
 		func() (int, int) { return len(datas), len(datas[0]) },
 		func() fyne.CanvasObject { return widget.NewLabel("wide content") },
 		func(i widget.TableCellID, o fyne.CanvasObject) {
@@ -66,10 +62,15 @@ func MiguMusicInit(setting *MiguMusicSetting) {
 				return
 			}
 
-			// 最后一列
+			// 下载列
+			if i.Col == len(datas[0])-2 {
+				tmp := o.(*widget.Label)
+				tmp.SetText("无损")
+				return
+			}
 			if i.Col == len(datas[0])-1 {
 				tmp := o.(*widget.Label)
-				tmp.SetText("下载")
+				tmp.SetText("高品质")
 				return
 			}
 
@@ -78,19 +79,18 @@ func MiguMusicInit(setting *MiguMusicSetting) {
 			o.(*widget.Label).SetText(data.Content.(string))
 		},
 	)
-
 	tab.SetColumnWidth(0, setting.Width*0.4)
-	tab.SetColumnWidth(1, setting.Width*0.25)
-	tab.SetColumnWidth(2, setting.Width*0.25)
-	tab.SetColumnWidth(3, setting.Width*0.09)
+	tab.SetColumnWidth(1, setting.Width*0.2)
+	tab.SetColumnWidth(2, setting.Width*0.2)
+	tab.SetColumnWidth(3, setting.Width*0.08)
+	//tab.SetColumnWidth(4, setting.Width*0.08)
 	tab.OnSelected = setting.OnDownload
-	tab.MinSize()
 
 	form = &widget.Form{
 		Items: []*widget.FormItem{ // we can specify items in the constructor
 			{Text: "关键字", Widget: txtKeyword},
 			{Text: "保存路径", Widget: txtDownloadPath},
-			{Text: "", Widget: btnBatchDownload},
+			//{Text: "", Widget: btnBatchDownload},
 		},
 		OnSubmit: func() {
 			pageIndex = 1
@@ -98,16 +98,17 @@ func MiguMusicInit(setting *MiguMusicSetting) {
 		},
 	}
 	form.SubmitText = "提交"
-	form.MinSize()
+
+	btnBatchDownloaderSQ := widget.NewButton("下载本页(无损)", func() { setting.OnBatchDownload(SourceType_SQ) })
+	btnBatchDownloaderHQ := widget.NewButton("下载本页(高品质)", func() { setting.OnBatchDownload(SourceType_HQ) })
 
 	pageContainer = container.NewHBox()
-	pageContainer.MinSize()
+	downloaderContainer := container.NewHBox(btnBatchDownloaderSQ, btnBatchDownloaderHQ)
+	toolContainer := container.NewHBox(pageContainer, downloaderContainer)
 
-	box := container.NewVBox(loading, form, pageContainer)
-	box.MinSize()
+	box := container.NewVBox(loading, form, toolContainer)
 	container := container.NewVSplit(box, tab)
 	container.SetOffset(-100)
-	container.MinSize()
 
 	myWindow.SetContent(container)
 	myWindow.ShowAndRun()
@@ -187,51 +188,56 @@ func (m *MiguMusicSetting) OnSearch(_pageIndex int) {
 	}()
 
 	searchDataRes, err := m.Search(txtKeyword.Text, _pageIndex, pageSize)
-
 	if err != nil {
 		showErr(err, myWindow)
 		return
-	} else {
-		//dialog.ShowInformation("测试结果", fmt.Sprintf("ip测试成功：延迟 %dms", delay), myWindow)
+	}
+	if searchDataRes.Code != searchSuccess {
+		showErr(errors.New(searchDataRes.Info), myWindow)
+		return
 	}
 
-	if searchDataRes.Code == "000000" {
-		datas = datas[:1]
-		for _, data := range searchDataRes.SongResultData.Result {
-			singers := []string{}
-			for _, singer := range data.Singers {
-				singers = append(singers, singer.Name)
-			}
-
-			albums := []string{}
-			for _, album := range data.Albums {
-				albums = append(albums, album.Name)
-			}
-
-			datas = append(datas, []interface{}{
-				TabData{
-					Type:    TabDataType_Data,
-					ColName: "name",
-					Content: data.Name,
-				},
-				TabData{
-					Type:    TabDataType_Data,
-					ColName: "singers",
-					Content: strings.Join(singers, "，"),
-				},
-				TabData{
-					Type:    TabDataType_Data,
-					ColName: "albums",
-					Content: strings.Join(albums, "，"),
-				},
-				TabData{
-					Type:    TabDataType_Buttons,
-					ColName: "action",
-					Content: data.ContentId,
-				},
-			})
+	datas = datas[:1]
+	for _, data := range searchDataRes.SongResultData.Result {
+		singers := []string{}
+		for _, singer := range data.Singers {
+			singers = append(singers, singer.Name)
 		}
+
+		albums := []string{}
+		for _, album := range data.Albums {
+			albums = append(albums, album.Name)
+		}
+
+		datas = append(datas, []interface{}{
+			TabData{
+				Type:    TabDataType_Data,
+				ColName: "name",
+				Content: data.Name,
+			},
+			TabData{
+				Type:    TabDataType_Data,
+				ColName: "singers",
+				Content: strings.Join(singers, "，"),
+			},
+			TabData{
+				Type:    TabDataType_Data,
+				ColName: "albums",
+				Content: strings.Join(albums, "，"),
+			},
+			TabData{
+				Type:    TabDataType_Buttons,
+				ColName: string(SourceType_SQ),
+				Content: data.ContentId,
+			},
+			TabData{
+				Type:    TabDataType_Buttons,
+				ColName: string(SourceType_HQ),
+				Content: data.ContentId,
+			},
+		})
 	}
+	tab.Refresh()
 
 	pageIndex = _pageIndex
 	total, _ := strconv.Atoi(searchDataRes.SongResultData.TotalCount)
@@ -260,13 +266,13 @@ func (m *MiguMusicSetting) OnDownload(id widget.TableCellID) {
 	}()
 
 	contentId := data.Content.(string)
-	name := datas[id.Row][0].(TabData).Content.(string) + ".mp3"
+	name := datas[id.Row][0].(TabData).Content.(string)
 
-	m.Download(contentId, name, txtDownloadPath.Text)
+	m.Download(SourceType(data.ColName), contentId, name, txtDownloadPath.Text)
 	dialog.ShowInformation("信息", fmt.Sprintf("下载完毕"), myWindow)
 }
 
-func (m *MiguMusicSetting) OnBatchDownload() {
+func (m *MiguMusicSetting) OnBatchDownload(sourceType SourceType) {
 	if loading.Visible() {
 		return
 	}
@@ -292,8 +298,8 @@ func (m *MiguMusicSetting) OnBatchDownload() {
 		//wg.Add(1)
 		//go func() {
 		contentId := _datas[len(_datas)-1].(TabData).Content.(string)
-		name := _datas[0].(TabData).Content.(string) + ".mp3"
-		m.Download(contentId, name, txtDownloadPath.Text)
+		name := _datas[0].(TabData).Content.(string)
+		m.Download(sourceType, contentId, name, txtDownloadPath.Text)
 		//}()
 	}
 
@@ -319,7 +325,7 @@ func (m *MiguMusicSetting) Search(keyword string, pageIndex, pageSize int) (*Sea
 	return &resp, nil
 }
 
-func (m *MiguMusicSetting) Download(contentId string, name, path string) error {
+func (m *MiguMusicSetting) Download(sourceType SourceType, contentId string, name, path string) error {
 	//无损：http://218.205.239.34/MIGUM2.0/v1.0/content/sub/listenSong.do?toneFlag=SQ&formatType=SQ&resourceType=E&netType=00&copyrightId=0&&contentId=600902000006889366&channel=0
 	//高品质：http://218.205.239.34/MIGUM2.0/v1.0/content/sub/listenSong.do?toneFlag=HQ&formatType=HQ&resourceType=2&netType=00&copyrightId=0&&contentId=600902000006889366&channel=0
 
@@ -327,8 +333,8 @@ func (m *MiguMusicSetting) Download(contentId string, name, path string) error {
 		path += "/"
 	}
 
-	path += name
-	url := fmt.Sprintf(m.DownloadUrl, contentId)
+	path += name + SourceType2FileExt[sourceType]
+	url := fmt.Sprintf(m.DownloadUrl, string(sourceType), contentId)
 	_, err := resty.New().R().SetOutput(path).Get(url)
 
 	return err
