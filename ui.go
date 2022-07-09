@@ -37,7 +37,7 @@ var (
 func MiguMusicInit(setting *MiguMusicSetting) {
 	myApp = app.New()
 	myApp.Settings().SetTheme(&ThemeDefault{})
-	myApp.SetIcon(resourceFavIco)
+	myApp.SetIcon(resourceFavPng)
 
 	myWindow = myApp.NewWindow(setting.Title)
 	myWindow.Resize(fyne.NewSize(setting.Width, setting.Height))
