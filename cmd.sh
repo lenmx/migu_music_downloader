@@ -13,7 +13,7 @@ function buildFromMac() {
       # mac 交叉编译到 windows 需要安装 brew install mingw-w64，并设置环境变量 CC="x86_64-w64-mingw32-gcc"
       env CC="x86_64-w64-mingw32-gcc" fyne package -os windows -icon fav.png
     ;;
-    *) echo '当前支持的交叉编译目标系统有 drawin|windows'
+    *) echo '当前支持的交叉编译目标系统有 darwin|windows'
     ;;
   esac
   echo "完成"

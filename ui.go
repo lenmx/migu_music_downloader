@@ -209,6 +209,24 @@ func (m *MiguMusicSetting) OnSearch(_pageIndex int) {
 			albums = append(albums, album.Name)
 		}
 
+		sqUrl := ""
+		hqUrl := ""
+		for _, item := range data.RateFormats {
+			if len(sqUrl) >0 && len(hqUrl) > 0 {
+				break
+			}
+
+			if item.FormatType == "SQ" {
+				sqUrl = strings.ReplaceAll(item.AndroidUrl, "ftp://218.200.160.122:21", "http://freetyst.nf.migu.cn")
+				continue
+			}
+
+			if item.FormatType == "HQ" {
+				hqUrl = strings.ReplaceAll(item.Url, "ftp://218.200.160.122:21", "http://freetyst.nf.migu.cn")
+				continue
+			}
+		}
+
 		datas = append(datas, []interface{}{
 			TabData{
 				Type:    TabDataType_Data,
@@ -228,12 +246,12 @@ func (m *MiguMusicSetting) OnSearch(_pageIndex int) {
 			TabData{
 				Type:    TabDataType_Buttons,
 				ColName: string(SourceType_SQ),
-				Content: data.ContentId,
+				Content: sqUrl,
 			},
 			TabData{
 				Type:    TabDataType_Buttons,
 				ColName: string(SourceType_HQ),
-				Content: data.ContentId,
+				Content: hqUrl,
 			},
 		})
 	}
@@ -265,10 +283,14 @@ func (m *MiguMusicSetting) OnDownload(id widget.TableCellID) {
 		loading.Hide()
 	}()
 
-	contentId := data.Content.(string)
+	url := data.Content.(string)
 	name := datas[id.Row][0].(TabData).Content.(string)
+	if len(url) <= 0 {
+		showErr(errors.New("下载地址错误"), myWindow)
+		return
+	}
 
-	m.Download(SourceType(data.ColName), contentId, name, txtDownloadPath.Text)
+		m.Download(SourceType(data.ColName), url, name, txtDownloadPath.Text)
 	dialog.ShowInformation("信息", fmt.Sprintf("下载完毕"), myWindow)
 }
 
@@ -297,9 +319,12 @@ func (m *MiguMusicSetting) OnBatchDownload(sourceType SourceType) {
 
 		//wg.Add(1)
 		//go func() {
-		contentId := _datas[len(_datas)-1].(TabData).Content.(string)
+		url := _datas[len(_datas)-1].(TabData).Content.(string)
+		if sourceType == SourceType_SQ {
+			url = _datas[len(_datas)-2].(TabData).Content.(string)
+		}
 		name := _datas[0].(TabData).Content.(string)
-		m.Download(sourceType, contentId, name, txtDownloadPath.Text)
+		m.Download(sourceType, url, name, txtDownloadPath.Text)
 		//}()
 	}
 
@@ -325,7 +350,7 @@ func (m *MiguMusicSetting) Search(keyword string, pageIndex, pageSize int) (*Sea
 	return &resp, nil
 }
 
-func (m *MiguMusicSetting) Download(sourceType SourceType, contentId string, name, path string) error {
+func (m *MiguMusicSetting) Download(sourceType SourceType, url string, name, path string) error {
 	//无损：http://218.205.239.34/MIGUM2.0/v1.0/content/sub/listenSong.do?toneFlag=SQ&formatType=SQ&resourceType=E&netType=00&copyrightId=0&&contentId=600902000006889366&channel=0
 	//高品质：http://218.205.239.34/MIGUM2.0/v1.0/content/sub/listenSong.do?toneFlag=HQ&formatType=HQ&resourceType=2&netType=00&copyrightId=0&&contentId=600902000006889366&channel=0
 
@@ -334,7 +359,7 @@ func (m *MiguMusicSetting) Download(sourceType SourceType, contentId string, nam
 	}
 
 	path += name + SourceType2FileExt[sourceType]
-	url := fmt.Sprintf(m.DownloadUrl, string(sourceType), contentId)
+	//url := fmt.Sprintf(m.DownloadUrl, string(sourceType), contentId)
 	_, err := resty.New().R().SetOutput(path).Get(url)
 
 	return err
